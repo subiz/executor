@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"time"
-
-	"stathat.com/c/consistent"
 )
 
 type Job struct {
@@ -17,7 +15,7 @@ type Handler func(Job) error
 
 // Executor executes job in parallel
 type Executor struct {
-	// A buffered channel that we can send work requests on.
+	// A channel that we can send work requests on.
 	jobQueue chan Job
 
 	// A pool of workers channels that are registered with the dispatcher
@@ -26,25 +24,15 @@ type Executor struct {
 	maxWorkers     uint
 	maxJobsInQueue uint // per worker
 	handler        Handler
-
-	// consistent hashing ring
-	circle *consistent.Consistent
 }
 
 func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
-	circle := consistent.New()
-
-	for i := 1; i <= int(maxWorkers); i++ {
-		circle.Add(intToStr(i))
-	}
-
 	e := &Executor{
 		jobQueue:       make(chan Job),
 		workerPool:     map[int]*Worker{},
 		maxWorkers:     maxWorkers,
 		maxJobsInQueue: maxJobsInQueue,
 		handler:        handler,
-		circle:         circle,
 	}
 
 	e.run()
@@ -80,8 +68,8 @@ func (e *Executor) dispatch() {
 
 		e.waitIdle()
 
-		workerID, _ := e.circle.Get(job.Key)
-		worker := e.getWorker(strToInt(workerID))
+		workerID := getWorkerID(job.Key, e.maxWorkers)
+		worker := e.getWorker(workerID)
 
 		// dispatch the job to the worker job channel
 		fmt.Println("Dispatching job")
