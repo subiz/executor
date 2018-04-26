@@ -87,7 +87,9 @@ func (e *Executor) Stop() {
 	}
 }
 
-func (e *Executor) Info() {
+func (e *Executor) Info() map[int]Counter {
+	info := map[int]Counter{}
+
 	var keys []int
 	for k := range e.workerPool {
 		keys = append(keys, k)
@@ -95,7 +97,10 @@ func (e *Executor) Info() {
 	sort.Ints(keys)
 	for _, k := range keys {
 		fmt.Printf("Worker %d: %v\n", k, e.workerPool[k].counter)
+		info[k] = e.workerPool[k].counter
 	}
+
+	return info
 }
 
 func (e *Executor) IsBusy() bool {
