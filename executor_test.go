@@ -101,7 +101,7 @@ func TestConcurrently(t *testing.T) {
 }
 
 // the executer must stop adding new job (block) if one of the queue is full.
-// khi gửi (MaxJobs + 3) jobs, job thứ MaxJobs + 3 bị block
+// khi gửi (MaxJobs + 1) jobs, job thứ MaxJobs + 1 bị block
 func TestBlockNewJob(t *testing.T) {
 	done := false
 	maxJobs := 4
@@ -111,12 +111,11 @@ func TestBlockNewJob(t *testing.T) {
 		return nil
 	})
 
-	for i := 1; i <= maxJobs+2; i++ {
-		executor.AddJob(Job{Key: "k", Data: i})
-	}
-
 	go func() {
-		executor.AddJob(Job{Key: "k", Data: maxJobs + 3})
+		for i := 1; i <= maxJobs+1; i++ {
+			executor.AddJob(Job{Key: "k", Data: i})
+		}
+
 		done = true
 	}()
 

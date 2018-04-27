@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -26,7 +27,12 @@ type Executor struct {
 	handler        Handler
 }
 
+// maxJobsInQueue >= 2
 func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
+	if maxJobsInQueue < 2 {
+		panic(errors.New("maxJobsInQueue must greater than 2"))
+	}
+
 	e := &Executor{
 		jobQueue:       make(chan Job),
 		workerPool:     map[int]*Worker{},
@@ -43,6 +49,7 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 // AddJob adds new job
 // block if one of the queue is full
 func (e *Executor) AddJob(job Job) error {
+	e.waitIdle()
 	e.jobQueue <- job
 	return nil
 }
@@ -65,8 +72,6 @@ func (e *Executor) dispatch() {
 	for job := range e.jobQueue {
 		// a job request has been received
 		fmt.Printf("Received job: %#v\n", job)
-
-		e.waitIdle()
 
 		workerID := getWorkerID(job.Key, e.maxWorkers)
 		worker := e.getWorker(workerID)
@@ -107,7 +112,7 @@ func (e *Executor) IsBusy() bool {
 	isBusy := false
 
 	for id, worker := range e.workerPool {
-		if worker.counter.Total-worker.counter.Done > e.maxJobsInQueue {
+		if worker.counter.Total-worker.counter.Done >= e.maxJobsInQueue-1 {
 			fmt.Printf("Worker %d is busy\n", id)
 			isBusy = true
 			break
