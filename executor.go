@@ -16,9 +16,6 @@ type Handler func(Job) error
 
 // Executor executes job in parallel
 type Executor struct {
-	// A channel that we can send work requests on.
-	jobQueue chan Job
-
 	// A pool of workers channels that are registered with the dispatcher
 	workerPool map[int]*Worker
 
@@ -34,7 +31,6 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 	}
 
 	e := &Executor{
-		jobQueue:       make(chan Job),
 		workerPool:     map[int]*Worker{},
 		maxWorkers:     maxWorkers,
 		maxJobsInQueue: maxJobsInQueue,
@@ -50,7 +46,7 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 // block if one of the queue is full
 func (e *Executor) AddJob(job Job) {
 	e.waitIdle()
-	e.jobQueue <- job
+	e.dispatch(job)
 }
 
 func (e *Executor) run() {
@@ -62,24 +58,20 @@ func (e *Executor) run() {
 
 		e.workerPool[workerID] = worker
 	}
-
-	go e.dispatch()
 }
 
-func (e *Executor) dispatch() {
-	for job := range e.jobQueue {
-		workerID := getWorkerID(job.Key, e.maxWorkers)
-		worker := e.getWorker(workerID)
+// dispatch send job to coresponding worker channel.
+// block if the worker's channel is full
+func (e *Executor) dispatch(job Job) {
+	workerID := getWorkerID(job.Key, e.maxWorkers)
+	worker := e.getWorker(workerID)
 
-		// dispatch the job to the worker job channel
-		worker.jobChannel <- job
-		worker.counter.Total++
-	}
+	// dispatch the job to the worker job channel
+	worker.jobChannel <- job
+	worker.counter.Total++
 }
 
 func (e *Executor) Stop() {
-	close(e.jobQueue)
-
 	for _, worker := range e.workerPool {
 		worker.stop()
 	}
