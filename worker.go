@@ -1,20 +1,11 @@
 package executor
 
-import (
-	"fmt"
-)
-
-type Counter struct {
-	Total uint
-	Done  uint
-}
-
 type Worker struct {
 	id         uint
 	jobChannel chan Job
 	quit       chan bool
 	handler    Handler
-	counter    Counter
+	jobcount   uint
 }
 
 // NewWorker creates, and returns a new Worker object. Its only argument
@@ -27,7 +18,6 @@ func NewWorker(id, maxJobs uint, handler Handler) *Worker {
 		jobChannel: make(chan Job, maxJobs-1),
 		quit:       make(chan bool),
 		handler:    handler,
-		counter:    Counter{},
 	}
 
 	return w
@@ -39,18 +29,9 @@ func (w *Worker) start() {
 	for {
 		select {
 		case job := <-w.jobChannel:
-			// Receive a job.
-			fmt.Printf("Worker %d: Received job\n", w.id)
-			err := w.handler(job)
-
-			if err != nil {
-				fmt.Printf("Worker %d: error process job - %s\n", w.id, err)
-			}
-
-			w.counter.Done++
+			w.jobcount++
+			w.handler(job)
 		case <-w.quit:
-			// We have been asked to stop.
-			fmt.Printf("Worker %d: stopping\n", w.id)
 			return
 		}
 	}

@@ -10,7 +10,7 @@ type Job struct {
 	Data interface{}
 }
 
-type Handler func(Job) error
+type Handler func(Job)
 
 // Executor executes job in parallel
 type Executor struct {
@@ -48,7 +48,6 @@ func (e *Executor) AddJob(job Job) {
 
 	// dispatch the job to the worker job channel
 	worker.jobChannel <- job
-	worker.counter.Total++
 }
 
 func (e *Executor) run() {
@@ -68,8 +67,8 @@ func (e *Executor) Stop() {
 	}
 }
 
-func (e *Executor) Info() map[int]Counter {
-	info := map[int]Counter{}
+func (e *Executor) Info() map[int]uint {
+	info := map[int]uint{}
 
 	var keys []int
 	for k := range e.workerPool {
@@ -77,7 +76,7 @@ func (e *Executor) Info() map[int]Counter {
 	}
 	sort.Ints(keys)
 	for _, k := range keys {
-		info[k] = e.workerPool[k].counter
+		info[k] = e.workerPool[k].jobcount
 	}
 
 	return info

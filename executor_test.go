@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -11,9 +10,7 @@ import (
 func TestEvenly(t *testing.T) {
 	maxWorkers := 5
 
-	executor := NewExecutor(uint(maxWorkers), 10000, func(job Job) error {
-		return nil
-	})
+	executor := NewExecutor(uint(maxWorkers), 10000, func(job Job) {})
 
 	totalJob := 5000
 
@@ -21,21 +18,18 @@ func TestEvenly(t *testing.T) {
 		executor.AddJob(Job{Key: intToStr(i), Data: i})
 	}
 
-	info := executor.Info()
-	fmt.Printf("info: %#v\n", info)
-
 	mean := totalJob / maxWorkers
 	samples := []int{}
 
+	info := executor.Info()
 	for _, counter := range info {
-		samples = append(samples, int(counter.Total))
+		samples = append(samples, int(counter))
 	}
 
 	stdDeviation := getStdDeviation(samples, mean)
 
 	expected := 0.05
 	got := stdDeviation / float64(mean)
-
 	if got >= expected {
 		t.Errorf("expected < %#v, got: %#v", expected, got)
 	}
@@ -46,14 +40,12 @@ func TestSequencely(t *testing.T) {
 	startTime := time.Now()
 	done := make(chan bool)
 
-	executor := NewExecutor(10, 100, func(job Job) error {
+	executor := NewExecutor(10, 100, func(job Job) {
 		time.Sleep(100 * time.Millisecond)
 
 		if job.Data.(string) == "2" {
 			done <- true
 		}
-
-		return nil
 	})
 
 	go func() {
@@ -74,14 +66,12 @@ func TestSequencely(t *testing.T) {
 func TestConcurrently(t *testing.T) {
 	done := false
 
-	executor := NewExecutor(10, 100, func(job Job) error {
+	executor := NewExecutor(10, 100, func(job Job) {
 		if job.Key == "5" {
 			done = true
 		} else {
 			time.Sleep(1 * time.Hour)
 		}
-
-		return nil
 	})
 
 	go func() {
@@ -104,9 +94,8 @@ func TestConcurrently(t *testing.T) {
 // khi gửi (MaxJobs + 1) jobs, job thứ MaxJobs + 1 bị block
 func TestBlockNewJob(t *testing.T) {
 	maxJobs := 4
-	executor := NewExecutor(1, uint(maxJobs), func(job Job) error {
+	executor := NewExecutor(1, uint(maxJobs), func(job Job) {
 		time.Sleep(1 * time.Hour)
-		return nil
 	})
 
 	donec, nextc := make(chan bool, 0), make(chan bool, 0)
