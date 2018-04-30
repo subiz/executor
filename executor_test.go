@@ -103,31 +103,30 @@ func TestConcurrently(t *testing.T) {
 // the executer must stop adding new job (block) if one of the queue is full.
 // khi gửi (MaxJobs + 1) jobs, job thứ MaxJobs + 1 bị block
 func TestBlockNewJob(t *testing.T) {
-	done := false
 	maxJobs := 4
-
-	executor := NewExecutor(10, uint(maxJobs), func(job Job) error {
+	executor := NewExecutor(1, uint(maxJobs), func(job Job) error {
 		time.Sleep(1 * time.Hour)
 		return nil
 	})
 
+	donec, nextc := make(chan bool, 0), make(chan bool, 0)
 	go func() {
-		for i := 1; i <= maxJobs+1; i++ {
+		for i := 0; i < maxJobs; i++ {
 			executor.AddJob(Job{Key: "k", Data: i})
 		}
+		nextc <- true // this should get call
 
-		done = true
+		executor.AddJob(Job{Key: "k", Data: maxJobs}) // this should block
+		donec <- true
 	}()
 
-	go func() {
-		time.Sleep(1 * time.Second)
-
-		if done {
-			t.FailNow()
-		}
-	}()
-
-	time.Sleep(2 * time.Second)
+	<-nextc
+	select {
+	case <-donec:
+		t.FailNow()
+	case <-time.After(1 * time.Second):
+		return
+	}
 }
 
 func getStdDeviation(samples []int, mean int) float64 {

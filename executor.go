@@ -2,9 +2,7 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 	"sort"
-	"time"
 )
 
 type Job struct {
@@ -45,8 +43,12 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 // AddJob adds new job
 // block if one of the queue is full
 func (e *Executor) AddJob(job Job) {
-	e.waitIdle()
-	e.dispatch(job)
+	workerID := getWorkerID(job.Key, e.maxWorkers)
+	worker := e.getWorker(workerID)
+
+	// dispatch the job to the worker job channel
+	worker.jobChannel <- job
+	worker.counter.Total++
 }
 
 func (e *Executor) run() {
@@ -58,17 +60,6 @@ func (e *Executor) run() {
 
 		e.workerPool[workerID] = worker
 	}
-}
-
-// dispatch send job to coresponding worker channel.
-// block if the worker's channel is full
-func (e *Executor) dispatch(job Job) {
-	workerID := getWorkerID(job.Key, e.maxWorkers)
-	worker := e.getWorker(workerID)
-
-	// dispatch the job to the worker job channel
-	worker.jobChannel <- job
-	worker.counter.Total++
 }
 
 func (e *Executor) Stop() {
@@ -92,27 +83,6 @@ func (e *Executor) Info() map[int]Counter {
 	return info
 }
 
-func (e *Executor) IsBusy() bool {
-	isBusy := false
-
-	for id, worker := range e.workerPool {
-		if worker.counter.Total-worker.counter.Done >= e.maxJobsInQueue-1 {
-			fmt.Printf("Worker %d is busy\n", id)
-			isBusy = true
-			break
-		}
-	}
-
-	return isBusy
-}
-
 func (e *Executor) getWorker(id int) *Worker {
 	return e.workerPool[id]
-}
-
-func (e *Executor) waitIdle() {
-	for e.IsBusy() {
-		fmt.Println("Still busy. Sleep 1 seconds")
-		time.Sleep(1 * time.Second)
-	}
 }

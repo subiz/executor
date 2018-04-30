@@ -24,7 +24,7 @@ func NewWorker(id, maxJobs uint, handler Handler) *Worker {
 	// Create, and return the worker.
 	w := &Worker{
 		id:         id,
-		jobChannel: make(chan Job, maxJobs),
+		jobChannel: make(chan Job, maxJobs-1),
 		quit:       make(chan bool),
 		handler:    handler,
 		counter:    Counter{},
