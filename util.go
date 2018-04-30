@@ -14,8 +14,7 @@ func strToInt(str string) int {
 	return i
 }
 
-func getWorkerID(key string, maxWorkers uint) int {
-	i := int(crc32.ChecksumIEEE([]byte(key)))
-	n := (i % int(maxWorkers)) + 1
-	return n
+func getWorkerID(key string, maxWorkers uint) uint {
+	i := uint(crc32.ChecksumIEEE([]byte(key)))
+	return i % maxWorkers
 }

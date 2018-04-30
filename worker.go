@@ -13,14 +13,12 @@ type Worker struct {
 // work.
 func NewWorker(id, maxJobs uint, handler Handler) *Worker {
 	// Create, and return the worker.
-	w := &Worker{
+	return &Worker{
 		id:         id,
 		jobChannel: make(chan Job, maxJobs-1),
 		quit:       make(chan bool),
 		handler:    handler,
 	}
-
-	return w
 }
 
 // This function "starts" the worker by starting a goroutine, that is
