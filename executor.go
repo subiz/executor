@@ -48,10 +48,9 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 
 // AddJob adds new job
 // block if one of the queue is full
-func (e *Executor) AddJob(job Job) error {
+func (e *Executor) AddJob(job Job) {
 	e.waitIdle()
 	e.jobQueue <- job
-	return nil
 }
 
 func (e *Executor) run() {
