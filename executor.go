@@ -57,7 +57,6 @@ func (e *Executor) run() {
 	// Now, create all of our workers.
 	for i := 1; i <= int(e.maxWorkers); i++ {
 		workerID := i
-		fmt.Printf("Starting worker %d\n", workerID)
 		worker := NewWorker(uint(workerID), e.maxJobsInQueue, e.handler)
 		go worker.start()
 
@@ -69,17 +68,12 @@ func (e *Executor) run() {
 
 func (e *Executor) dispatch() {
 	for job := range e.jobQueue {
-		// a job request has been received
-		fmt.Printf("Received job: %#v\n", job)
-
 		workerID := getWorkerID(job.Key, e.maxWorkers)
 		worker := e.getWorker(workerID)
 
 		// dispatch the job to the worker job channel
-		fmt.Println("Dispatching job")
 		worker.jobChannel <- job
 		worker.counter.Total++
-		fmt.Println("Dispatched")
 	}
 }
 
@@ -100,7 +94,6 @@ func (e *Executor) Info() map[int]Counter {
 	}
 	sort.Ints(keys)
 	for _, k := range keys {
-		fmt.Printf("Worker %d: %v\n", k, e.workerPool[k].counter)
 		info[k] = e.workerPool[k].counter
 	}
 
