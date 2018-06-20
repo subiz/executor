@@ -83,3 +83,15 @@ func (e *Executor) Wait() {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+func (e *Executor) Count() (uint, uint) {
+	var jobcount uint
+	var donecount uint
+
+	for _, w := range e.workers {
+		jobcount += w.jobcount
+		donecount += w.donecount
+	}
+
+	return jobcount, donecount
+}
