@@ -133,9 +133,7 @@ func getStdDeviation(samples []int, mean int) float64 {
 }
 
 func TestWait(t *testing.T) {
-	executor := NewExecutor(10, 10, func(job Job) {
-		return
-	})
+	executor := NewExecutor(10, 10, func(job Job) {})
 
 	for i := 1; i <= 10; i++ {
 		executor.AddJob(Job{Key: intToStr(i), Data: i})

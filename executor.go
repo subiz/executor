@@ -68,15 +68,8 @@ func (e *Executor) Info() map[int]uint {
 // wait until all jobs is done
 func (e *Executor) Wait() {
 	for {
-		var jobcount uint
-		var donecount uint
-
-		for _, w := range e.workers {
-			jobcount += w.jobcount
-			donecount += w.donecount
-		}
-
-		if donecount == jobcount {
+		njob, ndone := e.Count()
+		if ndone == njob {
 			break
 		}
 
