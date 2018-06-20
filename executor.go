@@ -1,5 +1,9 @@
 package executor
 
+import (
+	"time"
+)
+
 type Job struct {
 	Key  string
 	Data interface{}
@@ -59,4 +63,23 @@ func (e *Executor) Info() map[int]uint {
 	}
 
 	return info
+}
+
+// wait until all jobs is done
+func (e *Executor) Wait() {
+	for {
+		var jobcount uint
+		var donecount uint
+
+		for _, w := range e.workers {
+			jobcount += w.jobcount
+			donecount += w.donecount
+		}
+
+		if donecount == jobcount {
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
 }

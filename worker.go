@@ -6,6 +6,7 @@ type Worker struct {
 	quit       chan bool
 	handler    Handler
 	jobcount   uint
+	donecount  uint
 }
 
 // NewWorker creates, and returns a new Worker object. Its only argument
@@ -29,6 +30,7 @@ func (w *Worker) start() {
 		case job := <-w.jobChannel:
 			w.jobcount++
 			w.handler(job)
+			w.donecount++
 		case <-w.quit:
 			return
 		}
