@@ -42,11 +42,19 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 	return e
 }
 
+func New(nworkers, maxJobsInQueue uint, f func(string, interface{})) *Executor {
+	return NewExecutor(nworkers, maxJobsInQueue, func(j Job) { f(j.Key, j.Data) })
+}
+
 // AddJob adds new job
 // block if one of the queue is full
 func (e *Executor) AddJob(job Job) {
 	worker := e.workers[getWorkerID(job.Key, e.maxWorkers)]
 	worker.jobChannel <- job
+}
+
+func (e *Executor) Add(key string, data interface{}) {
+	e.AddJob(Job{Key: key, Data: data})
 }
 
 func (e *Executor) Stop() {
