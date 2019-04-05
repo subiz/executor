@@ -2,6 +2,7 @@ package executor
 
 import (
 	"math"
+	"sync"
 	"testing"
 	"time"
 )
@@ -133,11 +134,20 @@ func getStdDeviation(samples []int, mean int) float64 {
 }
 
 func TestWait(t *testing.T) {
-	executor := NewExecutor(10, 10, func(job Job) {})
-
-	for i := 1; i <= 10; i++ {
-		executor.AddJob(Job{Key: intToStr(i), Data: i})
-	}
+	mu := &sync.Mutex{}
+	i := 0
+	executor := NewExecutor(10, 10, func(job Job) {
+		mu.Lock()
+		i++
+		mu.Unlock()
+	})
+	executor.AddJob(Job{Key: intToStr(i), Data: i})
 
 	executor.Wait()
+	mu.Lock()
+
+	if i != 1 {
+		t.Fatal(i)
+	}
+	mu.Unlock()
 }

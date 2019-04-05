@@ -17,12 +17,13 @@ type Executor struct {
 	maxWorkers     uint
 	maxJobsInQueue uint // per worker
 	handler        Handler
+	jobCount       uint
 }
 
-// maxJobsInQueue >= 2
+// maxJobsInQueue > 1
 func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 	if maxJobsInQueue < 2 {
-		panic("maxJobsInQueue must greater than 2")
+		panic("maxJobsInQueue must greater than 1")
 	}
 
 	e := &Executor{
@@ -49,6 +50,7 @@ func New(nworkers, maxJobsInQueue uint, f func(string, interface{})) *Executor {
 // AddJob adds new job
 // block if one of the queue is full
 func (e *Executor) AddJob(job Job) {
+	e.jobCount++
 	worker := e.workers[getWorkerID(job.Key, e.maxWorkers)]
 	worker.jobChannel <- job
 }
@@ -67,13 +69,13 @@ func (e *Executor) Info() map[int]uint {
 	info := map[int]uint{}
 
 	for i, w := range e.workers {
-		info[i] = w.jobcount
+		info[i] = w.jobCount
 	}
 
 	return info
 }
 
-// wait until all jobs is done
+// Wait wait until all jobs is done
 func (e *Executor) Wait() {
 	for {
 		njob, ndone := e.Count()
@@ -85,14 +87,11 @@ func (e *Executor) Wait() {
 	}
 }
 
+// Count return job count, done count
 func (e *Executor) Count() (uint, uint) {
-	var jobcount uint
-	var donecount uint
-
+	var doneCount uint
 	for _, w := range e.workers {
-		jobcount += w.jobcount
-		donecount += w.donecount
+		doneCount += w.doneCount
 	}
-
-	return jobcount, donecount
+	return e.jobCount, doneCount
 }

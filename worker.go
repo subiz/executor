@@ -5,8 +5,8 @@ type Worker struct {
 	jobChannel chan Job
 	quit       chan bool
 	handler    Handler
-	jobcount   uint
-	donecount  uint
+	jobCount   uint
+	doneCount  uint
 }
 
 // NewWorker creates, and returns a new Worker object. Its only argument
@@ -28,9 +28,9 @@ func (w *Worker) start() {
 	for {
 		select {
 		case job := <-w.jobChannel:
-			w.jobcount++
+			w.jobCount++
 			w.handler(job)
-			w.donecount++
+			w.doneCount++
 		case <-w.quit:
 			return
 		}
