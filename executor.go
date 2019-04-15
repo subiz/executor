@@ -1,36 +1,27 @@
 package executor
 
-import (
-	"time"
-)
+import "time"
 
 type Job struct {
-	Key  string
-	Data interface{}
+	key  string
+	data interface{}
 }
-
-type Handler func(Job)
 
 // Executor executes job in parallel
 type Executor struct {
 	workers        []*Worker
 	maxWorkers     uint
 	maxJobsInQueue uint // per worker
-	handler        Handler
+	handler        func(string, interface{})
 	jobCount       uint
 }
 
-// maxJobsInQueue > 1
-func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
-	if maxJobsInQueue < 2 {
-		panic("maxJobsInQueue must greater than 1")
-	}
-
+func New(nworkers uint, f func(string, interface{})) *Executor {
 	e := &Executor{
-		workers:        make([]*Worker, 0, maxWorkers),
-		maxWorkers:     maxWorkers,
-		maxJobsInQueue: maxJobsInQueue,
-		handler:        handler,
+		workers:        make([]*Worker, 0, nworkers),
+		maxWorkers:     nworkers,
+		maxJobsInQueue: 20,
+		handler:        f,
 	}
 
 	// creates and runs workers
@@ -43,20 +34,12 @@ func NewExecutor(maxWorkers, maxJobsInQueue uint, handler Handler) *Executor {
 	return e
 }
 
-func New(nworkers, maxJobsInQueue uint, f func(string, interface{})) *Executor {
-	return NewExecutor(nworkers, maxJobsInQueue, func(j Job) { f(j.Key, j.Data) })
-}
-
 // AddJob adds new job
 // block if one of the queue is full
-func (e *Executor) AddJob(job Job) {
-	e.jobCount++
-	worker := e.workers[getWorkerID(job.Key, e.maxWorkers)]
-	worker.jobChannel <- job
-}
-
 func (e *Executor) Add(key string, data interface{}) {
-	e.AddJob(Job{Key: key, Data: data})
+	e.jobCount++
+	worker := e.workers[getWorkerID(key, e.maxWorkers)]
+	worker.jobChannel <- Job{key: key, data: data}
 }
 
 func (e *Executor) Stop() {

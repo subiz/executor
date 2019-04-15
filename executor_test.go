@@ -11,12 +11,12 @@ import (
 func TestEvenly(t *testing.T) {
 	maxWorkers := 5
 
-	executor := NewExecutor(uint(maxWorkers), 10000, func(job Job) {})
+	executor := New(uint(maxWorkers), func(_ string, _ interface{}) {})
 
-	totalJob := 5000
+	totalJob := 50000
 
 	for i := 1; i <= totalJob; i++ {
-		executor.AddJob(Job{Key: intToStr(i), Data: i})
+		executor.Add(intToStr(i), i)
 	}
 
 	mean := totalJob / maxWorkers
@@ -41,17 +41,17 @@ func TestSequencely(t *testing.T) {
 	startTime := time.Now()
 	done := make(chan bool)
 
-	executor := NewExecutor(10, 100, func(job Job) {
+	executor := New(10, func(key string, data interface{}) {
 		time.Sleep(100 * time.Millisecond)
 
-		if job.Data.(string) == "2" {
+		if data.(string) == "2" {
 			done <- true
 		}
 	})
 
 	go func() {
-		executor.AddJob(Job{Key: "k1", Data: "1"})
-		executor.AddJob(Job{Key: "k1", Data: "2"})
+		executor.Add("k1", "1")
+		executor.Add("k1", "2")
 	}()
 
 	<-done
@@ -67,8 +67,8 @@ func TestSequencely(t *testing.T) {
 func TestConcurrently(t *testing.T) {
 	done := false
 
-	executor := NewExecutor(10, 100, func(job Job) {
-		if job.Key == "5" {
+	executor := New(10, func(key string, data interface{}) {
+		if key == "5" {
 			done = true
 		} else {
 			time.Sleep(1 * time.Hour)
@@ -77,7 +77,7 @@ func TestConcurrently(t *testing.T) {
 
 	go func() {
 		for i := 1; i <= 5; i++ {
-			executor.AddJob(Job{Key: intToStr(i), Data: i})
+			executor.Add(intToStr(i), i)
 		}
 	}()
 
@@ -89,34 +89,6 @@ func TestConcurrently(t *testing.T) {
 	}()
 
 	time.Sleep(100 * time.Millisecond) // wait checker
-}
-
-// the executer must stop adding new job (block) if one of the queue is full.
-// khi gửi (MaxJobs + 1) jobs, job thứ MaxJobs + 1 bị block
-func TestBlockNewJob(t *testing.T) {
-	maxJobs := 4
-	executor := NewExecutor(1, uint(maxJobs), func(job Job) {
-		time.Sleep(1 * time.Hour)
-	})
-
-	donec, nextc := make(chan bool, 0), make(chan bool, 0)
-	go func() {
-		for i := 0; i < maxJobs; i++ {
-			executor.AddJob(Job{Key: "k", Data: i})
-		}
-		nextc <- true // this should get call
-
-		executor.AddJob(Job{Key: "k", Data: maxJobs}) // this should block
-		donec <- true
-	}()
-
-	<-nextc
-	select {
-	case <-donec:
-		t.FailNow()
-	case <-time.After(1 * time.Second):
-		return
-	}
 }
 
 func getStdDeviation(samples []int, mean int) float64 {
@@ -136,12 +108,12 @@ func getStdDeviation(samples []int, mean int) float64 {
 func TestWait(t *testing.T) {
 	mu := &sync.Mutex{}
 	i := 0
-	executor := NewExecutor(10, 10, func(job Job) {
+	executor := New(10, func(_ string, _ interface{}) {
 		mu.Lock()
 		i++
 		mu.Unlock()
 	})
-	executor.AddJob(Job{Key: intToStr(i), Data: i})
+	executor.Add(intToStr(i), i)
 
 	executor.Wait()
 	mu.Lock()

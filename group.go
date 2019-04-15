@@ -7,7 +7,6 @@ type groupJob struct {
 	key     string
 	value   interface{}
 }
-
 type GroupMgr struct {
 	*sync.Mutex
 	exec   *Executor
@@ -21,7 +20,7 @@ type GroupMgr struct {
 func NewGroupMgr(maxWorkers uint) *GroupMgr {
 	me := &GroupMgr{Mutex: &sync.Mutex{}, groups: make(map[int]*Group)}
 
-	me.exec = New(maxWorkers, 10, func(key string, value interface{}) {
+	me.exec = New(maxWorkers, func(key string, value interface{}) {
 		job := value.(groupJob)
 		me.Lock()
 		group := me.groups[job.groupID]
@@ -90,10 +89,10 @@ func (me *Group) handle(key string, value interface{}) {
 	me.lock.Unlock()
 }
 
-// Wait blocks current caller until there is no processing jobs.
+// Wait blocks current caller until there is no processing jobs. This function
+// is must be call after you done with the group. Otherwise the group stay forever
 // Note: This function also release the current group, future calls to Add
-// will be ignore. So make sure this is the last function you call after done
-// with the group
+// will be ignore.
 func (me *Group) Wait() {
 	me.barrier.Lock()
 	me.barrier.Unlock()
