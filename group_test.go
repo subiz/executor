@@ -6,12 +6,12 @@ import (
 )
 
 func TestGroup(t *testing.T) {
-	eg := NewExecutorGroup(10)
+	eg := NewGroupMgr(10)
 
 	total := 0
 	group := eg.NewGroup(func(key string, value interface{}) {
 		total++
-		time.Sleep(1 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 	})
 
 	for i := 0; i < 10; i++ {

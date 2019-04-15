@@ -2,105 +2,92 @@ package executor
 
 import "sync"
 
-type IGroupMgr interface {
-	Add(groupID int, key string, value interface{})
-	Delete(groupID int)
-	Lock()
-	Unlock()
-}
-
 type groupJob struct {
 	groupID int
 	key     string
 	value   interface{}
 }
 
-type ExecutorGroup struct {
+type GroupMgr struct {
 	*sync.Mutex
-	exec      *Executor
-	groups    map[int]*Group
-	counter   int
-	groupLock *sync.Mutex
+	exec   *Executor
+	groups map[int]*Group
+
+	// used to alloc group id, increases each time a new group is added
+	counter int
 }
 
-func NewExecutorGroup(maxWorkers uint) *ExecutorGroup {
-	me := &ExecutorGroup{
-		Mutex:   &sync.Mutex{},
-		groups:    make(map[int]*Group),
-		groupLock: &sync.Mutex{},
-	}
+// NewGroupMgr creates a new GroupMgr object
+func NewGroupMgr(maxWorkers uint) *GroupMgr {
+	me := &GroupMgr{Mutex: &sync.Mutex{}, groups: make(map[int]*Group)}
 
-	exec := New(maxWorkers, 10, func(key string, value interface{}) {
+	me.exec = New(maxWorkers, 10, func(key string, value interface{}) {
 		job := value.(groupJob)
 		me.Lock()
 		group := me.groups[job.groupID]
 		me.Unlock()
-		group.Handle(key, job.value)
+		group.handle(key, job.value)
 	})
-
-	me.exec = exec
 	return me
 }
 
-func (me *ExecutorGroup) Add(groupID int, key string, value interface{}) {
+// add is called by a group to registers a job
+func (me *GroupMgr) addJob(groupID int, key string, value interface{}) {
 	me.exec.Add(key, groupJob{groupID: groupID, key: key, value: value})
 }
 
-func (me *ExecutorGroup) Delete(groupID int) {
+// deleteGroup is called by a group to release itself from the manager
+func (me *GroupMgr) deleteGroup(groupID int) {
 	me.Lock()
 	delete(me.groups, groupID)
 	me.Unlock()
 }
 
-func (me *ExecutorGroup) NewGroup(handler func(string, interface{})) *Group {
+// NewGroup registers a group to the manager
+func (me *GroupMgr) NewGroup(handler func(string, interface{})) *Group {
 	me.Lock()
 	me.counter++
 	id := me.counter
-	group := &Group{id: id, mgr: me, barrier: &sync.Mutex{}, handler: handler}
+	group := &Group{lock: me.Mutex, id: id, mgr: me, barrier: &sync.Mutex{}, handler: handler}
 	me.groups[id] = group
 	me.Unlock()
 	return group
 }
 
-func (me *ExecutorGroup) Lock() {
-	me.groupLock.Lock()
-}
-
-func (me *ExecutorGroup) Unlock() {
-	me.groupLock.Unlock()
-}
-
 type Group struct {
 	id               int
-	mgr              IGroupMgr
+	mgr              *GroupMgr
 	barrier          *sync.Mutex
-	numProcessingJob int
+
+	lock             *sync.Mutex // protect numProcessingJob
+	numProcessingJob int // holds current number of processing jobs
+
 	handler          func(string, interface{})
 }
 
 // Add adds a new job.
 // Caution: calling a released (deleted) group have no effect. User should make
 // sure that Add is alway called before Wait
-func (me Group) Add(key string, value interface{}) {
-	me.mgr.Lock()
+func (me *Group) Add(key string, value interface{}) {
+	me.lock.Lock()
 	me.numProcessingJob++
 	if me.numProcessingJob == 1 {
 		me.barrier.Lock()
 	}
-	me.mgr.Unlock()
-	me.mgr.Add(me.id, key, value)
+	me.lock.Unlock()
+	me.mgr.addJob(me.id, key, value)
 }
 
-// Handler is used by the manager to call users' handler function
-func (me *Group) Handle(key string, value interface{}) {
+// handler is used by the manager to call users' handler function
+func (me *Group) handle(key string, value interface{}) {
 	me.handler(key, value)
 
-	me.mgr.Lock()
+	me.lock.Lock()
 	me.numProcessingJob--
 	if me.numProcessingJob == 0 {
 		me.barrier.Unlock()
 	}
-	me.mgr.Unlock()
+	me.lock.Unlock()
 }
 
 // Wait blocks current caller until there is no processing jobs.
@@ -110,5 +97,5 @@ func (me *Group) Handle(key string, value interface{}) {
 func (me *Group) Wait() {
 	me.barrier.Lock()
 	me.barrier.Unlock()
-	me.mgr.Delete(me.id)
+	me.mgr.deleteGroup(me.id)
 }
