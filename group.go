@@ -16,7 +16,7 @@ type groupJob struct {
 }
 
 type ExecutorGroup struct {
-	*sync.RWMutex
+	*sync.Mutex
 	exec      *Executor
 	groups    map[int]*Group
 	counter   int
@@ -25,16 +25,16 @@ type ExecutorGroup struct {
 
 func NewExecutorGroup(maxWorkers uint) *ExecutorGroup {
 	me := &ExecutorGroup{
-		RWMutex:   &sync.RWMutex{},
+		Mutex:   &sync.Mutex{},
 		groups:    make(map[int]*Group),
 		groupLock: &sync.Mutex{},
 	}
 
 	exec := New(maxWorkers, 10, func(key string, value interface{}) {
 		job := value.(groupJob)
-		me.RLock()
+		me.Lock()
 		group := me.groups[job.groupID]
-		me.RUnlock()
+		me.Unlock()
 		group.Handle(key, job.value)
 	})
 
