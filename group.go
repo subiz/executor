@@ -78,7 +78,10 @@ type Group struct {
 	handler          func(string, interface{})
 }
 
-func (me *Group) Add(key string, value interface{}) {
+// Add adds a new job.
+// Caution: calling a released (deleted) group have no effect. User should make
+// sure that Add is alway called before Wait
+func (me Group) Add(key string, value interface{}) {
 	me.mgr.Lock()
 	me.numProcessingJob++
 	if me.numProcessingJob == 1 {
@@ -88,10 +91,7 @@ func (me *Group) Add(key string, value interface{}) {
 	me.mgr.Add(me.id, key, value)
 }
 
-func (me *Group) Delete() {
-	me.mgr.Delete(me.id)
-}
-
+// Handler is used by the manager to call users' handler function
 func (me *Group) Handle(key string, value interface{}) {
 	me.handler(key, value)
 
@@ -103,7 +103,12 @@ func (me *Group) Handle(key string, value interface{}) {
 	me.mgr.Unlock()
 }
 
+// Wait blocks current caller until there is no processing jobs.
+// Note: This function also release the current group, future calls to Add
+// will be ignore. So make sure this is the last function you call after done
+// with the group
 func (me *Group) Wait() {
 	me.barrier.Lock()
 	me.barrier.Unlock()
+	me.mgr.Delete(me.id)
 }
