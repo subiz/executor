@@ -1,6 +1,9 @@
 package executor
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type Job struct {
 	key  string
@@ -9,52 +12,46 @@ type Job struct {
 
 // Executor executes job in parallel
 type Executor struct {
-	workers        []*Worker
-	maxWorkers     uint
-	maxJobsInQueue uint // per worker
-	handler        func(string, interface{})
-	jobCount       uint
+	sync.Mutex
+	workers map[string]*Worker
+	handler func(string, interface{})
+	njob    uint // total jobs
 }
 
-func New(nworkers uint, f func(string, interface{})) *Executor {
-	e := &Executor{
-		workers:        make([]*Worker, 0, nworkers),
-		maxWorkers:     nworkers,
-		maxJobsInQueue: 20,
-		handler:        f,
+func New(f func(string, interface{})) *Executor {
+	return &Executor{
+		workers: make(map[string]*Worker),
+		handler: f,
 	}
-
-	// creates and runs workers
-	for i := uint(0); i < e.maxWorkers; i++ {
-		worker := NewWorker(i, e.maxJobsInQueue, e.handler)
-		e.workers = append(e.workers, worker)
-		go worker.start()
-	}
-
-	return e
 }
 
 // AddJob adds new job
 // block if one of the queue is full
 func (e *Executor) Add(key string, data interface{}) {
-	e.jobCount++
-	worker := e.workers[getWorkerID(key, e.maxWorkers)]
-	worker.jobChannel <- Job{key: key, data: data}
+	e.Lock()
+	defer e.Unlock()
+	if _, found := e.workers[key]; !found {
+		e.addWorker(key)
+	}
+	w := e.workers[key]
+	e.njob++
+	w.jobchan <- Job{key: key, data: data}
 }
 
 func (e *Executor) Stop() {
-	for _, worker := range e.workers {
-		worker.stop()
+	for _, w := range e.workers {
+		w.stop()
 	}
 }
 
-func (e *Executor) Info() map[int]uint {
-	info := map[int]uint{}
-
-	for i, w := range e.workers {
-		info[i] = w.jobCount
+// Info returns total jobs of each worker
+func (e *Executor) Info() map[string]uint {
+	e.Lock()
+	defer e.Unlock()
+	info := map[string]uint{}
+	for id, w := range e.workers {
+		info[id] = w.njob
 	}
-
 	return info
 }
 
@@ -65,16 +62,29 @@ func (e *Executor) Wait() {
 		if ndone == njob {
 			break
 		}
-
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-// Count return job count, done count
+// Count returns job count, done count
 func (e *Executor) Count() (uint, uint) {
-	var doneCount uint
+	e.Lock()
+	defer e.Unlock()
+	var ndone uint
 	for _, w := range e.workers {
-		doneCount += w.doneCount
+		ndone += w.ndone
 	}
-	return e.jobCount, doneCount
+	return e.njob, ndone
+}
+
+// the caller must lock when to call this function
+func (e *Executor) addWorker(id string) {
+	w := NewWorker(id, e.handler, e)
+	e.workers[id] = w
+	go w.start()
+}
+
+// the caller must lock when to call this function
+func (e *Executor) removeWorker(id string) {
+	delete(e.workers, id)
 }

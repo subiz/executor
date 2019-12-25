@@ -17,10 +17,10 @@ type GroupMgr struct {
 }
 
 // NewGroupMgr creates a new GroupMgr object
-func NewGroupMgr(maxWorkers uint) *GroupMgr {
+func NewGroupMgr() *GroupMgr {
 	me := &GroupMgr{Mutex: &sync.Mutex{}, groups: make(map[int]*Group)}
 
-	me.exec = New(maxWorkers, func(key string, value interface{}) {
+	me.exec = New(func(key string, value interface{}) {
 		job := value.(groupJob)
 		me.Lock()
 		group := me.groups[job.groupID]
@@ -54,14 +54,14 @@ func (me *GroupMgr) NewGroup(handler func(string, interface{})) *Group {
 }
 
 type Group struct {
-	id               int
-	mgr              *GroupMgr
-	barrier          *sync.Mutex
+	id      int
+	mgr     *GroupMgr
+	barrier *sync.Mutex
 
 	lock             *sync.Mutex // protect numProcessingJob
-	numProcessingJob int // holds current number of processing jobs
+	numProcessingJob int         // holds current number of processing jobs
 
-	handler          func(string, interface{})
+	handler func(string, interface{})
 }
 
 // Add adds a new job.

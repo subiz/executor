@@ -6,7 +6,7 @@ import (
 )
 
 func TestGroup(t *testing.T) {
-	eg := NewGroupMgr(10)
+	eg := NewGroupMgr()
 
 	total := 0
 	group := eg.NewGroup(func(key string, value interface{}) {

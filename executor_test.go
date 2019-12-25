@@ -1,47 +1,17 @@
 package executor
 
 import (
-	"math"
 	"sync"
 	"testing"
 	"time"
 )
-
-// the executer should evenly dispatch the jobs to all goroutines.
-func TestEvenly(t *testing.T) {
-	maxWorkers := 5
-
-	executor := New(uint(maxWorkers), func(_ string, _ interface{}) {})
-
-	totalJob := 50000
-
-	for i := 1; i <= totalJob; i++ {
-		executor.Add(intToStr(i), i)
-	}
-
-	mean := totalJob / maxWorkers
-	samples := []int{}
-
-	info := executor.Info()
-	for _, counter := range info {
-		samples = append(samples, int(counter))
-	}
-
-	stdDeviation := getStdDeviation(samples, mean)
-
-	expected := 0.05
-	got := stdDeviation / float64(mean)
-	if got >= expected {
-		t.Errorf("expected < %#v, got: %#v", expected, got)
-	}
-}
 
 // the executer must execute 2 jobs with the same key sequencely.
 func TestSequencely(t *testing.T) {
 	startTime := time.Now()
 	done := make(chan bool)
 
-	executor := New(10, func(key string, data interface{}) {
+	exe := New(func(key string, data interface{}) {
 		time.Sleep(100 * time.Millisecond)
 
 		if data.(string) == "2" {
@@ -50,8 +20,8 @@ func TestSequencely(t *testing.T) {
 	})
 
 	go func() {
-		executor.Add("k1", "1")
-		executor.Add("k1", "2")
+		exe.Add("k1", "1")
+		exe.Add("k1", "2")
 	}()
 
 	<-done
@@ -67,7 +37,7 @@ func TestSequencely(t *testing.T) {
 func TestConcurrently(t *testing.T) {
 	done := false
 
-	executor := New(10, func(key string, data interface{}) {
+	exe := New(func(key string, data interface{}) {
 		if key == "5" {
 			done = true
 		} else {
@@ -77,7 +47,7 @@ func TestConcurrently(t *testing.T) {
 
 	go func() {
 		for i := 1; i <= 5; i++ {
-			executor.Add(intToStr(i), i)
+			exe.Add(intToStr(i), i)
 		}
 	}()
 
@@ -91,35 +61,39 @@ func TestConcurrently(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait checker
 }
 
-func getStdDeviation(samples []int, mean int) float64 {
-	sum := 0
-
-	for _, v := range samples {
-		deviation := v - mean
-		sum += deviation * deviation
-	}
-
-	variance := sum / (len(samples) - 1)
-	stdDeviation := math.Sqrt(float64(variance))
-
-	return stdDeviation
-}
-
 func TestWait(t *testing.T) {
 	mu := &sync.Mutex{}
 	i := 0
-	executor := New(10, func(_ string, _ interface{}) {
+	exe := New(func(_ string, _ interface{}) {
 		mu.Lock()
 		i++
 		mu.Unlock()
 	})
-	executor.Add(intToStr(i), i)
+	exe.Add(intToStr(i), i)
 
-	executor.Wait()
+	exe.Wait()
 	mu.Lock()
 
 	if i != 1 {
 		t.Fatal(i)
 	}
 	mu.Unlock()
+}
+
+func TestTearDown(t *testing.T) {
+	exe := New(func(_ string, _ interface{}) {})
+
+	go func() {
+		for i := 1; i <= 100; i++ {
+			exe.Add(intToStr(i), i)
+		}
+	}()
+
+	exe.Wait()
+	time.Sleep(TIMEOUT + 1*time.Second)
+
+	info := exe.Info()
+	if len(info) != 0 {
+		t.FailNow()
+	}
 }
