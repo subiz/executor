@@ -7,6 +7,9 @@ import (
 func Async(N int, f func(i int, lock *sync.Mutex), limit int) {
 	lock := &sync.Mutex{}
 	wg := &sync.WaitGroup{}
+	if N <= 0 {
+		return
+	}
 	if limit < 1 {
 		limit = 1
 	}
